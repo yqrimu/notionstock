@@ -1,0 +1,50 @@
+/* Ollama Plugin Styles */
+
+.ollama-progress-modal {
+	padding: 1rem;
+}
+
+.ollama-progress-header h3 {
+	margin: 0 0 1rem 0;
+}
+
+.ollama-progress-status {
+	font-size: 0.9em;
+	color: var(--text-muted);
+	margin-bottom: 0.5rem;
+}
+
+.ollama-progress-status.ollama-success {
+	color: var(--text-success);
+}
+
+.ollama-progress-status.ollama-error {
+	color: var(--text-error);
+}
+
+.ollama-progress-content {
+	max-height: 300px;
+	overflow-y: auto;
+	background-color: var(--background-secondary);
+	border-radius: 4px;
+	padding: 0.75rem;
+	margin-bottom: 1rem;
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+	line-height: 1.5;
+}
+
+.ollama-progress-text {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.ollama-progress-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+
+.ollama-progress-buttons button {
+	padding: 0.5rem 1rem;
+}
