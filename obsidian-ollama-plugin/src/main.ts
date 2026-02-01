@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice, Plugin, TFile, TAbstractFile, Menu } from "obsidian";
+import { Editor, Notice, Plugin, TFile, TAbstractFile, Menu } from "obsidian";
 import { OllamaPluginSettings, DEFAULT_SETTINGS, OllamaSettingTab } from "./settings";
 import { OllamaService } from "./ollama-service";
 import { ProgressModal } from "./ui/progress-modal";
@@ -18,8 +18,7 @@ export default class OllamaPlugin extends Plugin {
 
 		// Register editor context menu (right-click on selected text)
 		this.registerEvent(
-			// @ts-expect-error - Obsidian types don't include editor-menu event
-			this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor, _view: MarkdownView) => {
+			this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor) => {
 				const selection = editor.getSelection();
 				if (selection && selection.trim().length > 0) {
 					this.addEditorMenuItems(menu, editor, selection);
@@ -76,11 +75,10 @@ export default class OllamaPlugin extends Plugin {
 			},
 		});
 
-		console.log("Ollama plugin loaded");
 	}
 
 	onunload(): void {
-		console.log("Ollama plugin unloaded");
+		// Cleanup handled by Obsidian's plugin system
 	}
 
 	async loadSettings(): Promise<void> {
@@ -105,7 +103,7 @@ export default class OllamaPlugin extends Plugin {
 
 		menu.addItem((item) => {
 			item.setTitle("Rewrite and Expand using Ollama")
-				.setIcon("expand")
+				.setIcon("unfold-vertical")
 				.onClick(() => this.expandSelection(editor, selection));
 		});
 

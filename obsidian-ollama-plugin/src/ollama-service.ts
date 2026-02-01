@@ -32,10 +32,6 @@ export class OllamaService {
 		return this.getSettings().defaultModel;
 	}
 
-	private get timeout(): number {
-		return this.getSettings().requestTimeout;
-	}
-
 	/**
 	 * Test connection to Ollama server
 	 */
@@ -63,9 +59,11 @@ export class OllamaService {
 			});
 
 			const data = response.json as OllamaListResponse;
+			if (!data.models || !Array.isArray(data.models)) {
+				return [];
+			}
 			return data.models.map((m) => m.name);
-		} catch (error) {
-			console.error("Failed to list Ollama models:", error);
+		} catch {
 			throw new Error("Failed to list models. Is Ollama running?");
 		}
 	}
@@ -94,7 +92,6 @@ export class OllamaService {
 			const data = response.json as OllamaGenerateResponse;
 			return data.response;
 		} catch (error) {
-			console.error("Ollama generate error:", error);
 			throw this.handleError(error);
 		}
 	}
@@ -165,7 +162,6 @@ export class OllamaService {
 			if (error instanceof Error && error.name === "AbortError") {
 				throw new Error("Request was cancelled");
 			}
-			console.error("Ollama streaming error:", error);
 			throw this.handleError(error);
 		}
 	}

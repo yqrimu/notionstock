@@ -6,7 +6,6 @@ export class ProgressModal extends Modal {
 	private statusEl!: HTMLElement;
 	private cancelButton!: HTMLButtonElement;
 	private abortController: AbortController;
-	private onCancel: (() => void) | null = null;
 
 	constructor(app: App) {
 		super(app);
@@ -56,33 +55,29 @@ export class ProgressModal extends Modal {
 		this.textEl.setText(text);
 	}
 
-	clearText(): void {
-		this.textEl.empty();
-	}
-
 	getAbortSignal(): AbortSignal {
 		return this.abortController.signal;
 	}
 
-	setOnCancel(callback: () => void): void {
-		this.onCancel = callback;
-	}
-
 	private cancel(): void {
 		this.abortController.abort();
-		if (this.onCancel) {
-			this.onCancel();
-		}
 		this.close();
 	}
 
+	private clearStatusClasses(): void {
+		this.statusEl.removeClass("ollama-success");
+		this.statusEl.removeClass("ollama-error");
+	}
+
 	showSuccess(message: string): void {
+		this.clearStatusClasses();
 		this.statusEl.setText(message);
 		this.statusEl.addClass("ollama-success");
 		this.cancelButton.setText("Close");
 	}
 
 	showError(message: string): void {
+		this.clearStatusClasses();
 		this.statusEl.setText(message);
 		this.statusEl.addClass("ollama-error");
 		this.cancelButton.setText("Close");

@@ -101,10 +101,15 @@ export class OllamaSettingTab extends PluginSettingTab {
 
 		if (this.availableModels.length > 0) {
 			modelSetting.addDropdown((dropdown) => {
+				// Add current model first if not in list (ensures it shows correctly)
+				const currentModel = this.plugin.settings.defaultModel;
+				if (currentModel && !this.availableModels.includes(currentModel)) {
+					dropdown.addOption(currentModel, `${currentModel} (not found)`);
+				}
 				this.availableModels.forEach((model) => {
 					dropdown.addOption(model, model);
 				});
-				dropdown.setValue(this.plugin.settings.defaultModel);
+				dropdown.setValue(currentModel);
 				dropdown.onChange(async (value) => {
 					this.plugin.settings.defaultModel = value;
 					await this.plugin.saveSettings();
