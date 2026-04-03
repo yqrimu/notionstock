@@ -1,13 +1,16 @@
 # Claude Assistant Documentation - Notion Trading System
 
 ## Project Overview
-This is a fully functional Notion trading system integration that populates Trading Research database with previous day OHLCV data using Alpha Vantage and EODHD APIs as backup.
+This is a fully functional Notion trading system integration with two main workflows:
+1. **Trading Research Population**: Automatically fills OHLCV data using Alpha Vantage and EODHD APIs
+2. **Trading Notes Parsing**: Manual parsing of Chinese trading notes with Claude assistance
 
 ## ✅ Current Status - PRODUCTION READY
 - **Trading Research Population**: 53/98 entries successfully filled (54% success rate)
 - **Remaining 45 entries**: Mostly `.SPX` index entries + some invalid/delisted tickers
-- **Last Update**: October 24, 2025
+- **Last Update**: November 26, 2025
 - **System Status**: Fully operational with dual API backup + multi-key rotation
+- **Parsing Approach**: Manual with Claude assistance (automation tested but not accurate enough)
 
 ## Key Information
 
@@ -26,21 +29,71 @@ This is a fully functional Notion trading system integration that populates Trad
 
 ### Database Structure
 **Trading Research Entries:**
-- **Date**: Reference date for previous day calculations
-- **Stock 1**: Relation field linking to Stocks database  
-- **Prev. Close**: Number field (populated by script)
-- **Prev. High**: Rich text field (populated by script)
-- **Prev. Low**: Rich text field (populated by script)
-- **Prev. Volume**: Number field (populated by script)
-- **Notes**: Title field (usually empty)
-- **Ladder**: Number field (manual/other processes)
+- **Date**: Reference datetime (supports YYYY-MM-DDTHH:MM:SS for timestamp precision)
+- **Stock 1**: Relation field linking to Stocks database
+- **Prev. Close**: Number field (populated by populate_trading_research.py)
+- **Prev. High**: Rich text field (populated by populate_trading_research.py)
+- **Prev. Low**: Rich text field (populated by populate_trading_research.py)
+- **Prev. Volume**: Number field (populated by populate_trading_research.py)
+- **Notes**: Title field (parsed trading notes)
+- **Resistance**: Rich text field (from parsed notes)
+- **Support**: Rich text field (from parsed notes)
+- **Buy Point**: Rich text field (from parsed notes)
+- **Sell Point**: Rich text field (from parsed notes)
+- **Ladder**: Number field (from parsed notes)
 
-## 🔧 Working Scripts
+## 🚀 Claude Skills (Slash Commands)
 
-### Main Production Script
+This project includes custom Claude skills for streamlined trading workflows. Use these instead of manual steps.
+
+### Available Skills
+
+| Command | Description | When to Use |
+|---------|-------------|-------------|
+| `/trading-parse` | Parse Chinese trading notes into ASCII table | When you have new trading notes to parse |
+| `/trading-insert` | Insert parsed entries to Notion + Obsidian | After `/trading-parse` output is confirmed |
+| `/trading-ohlcv` | Populate OHLCV data for entries | After insertion, or anytime to fill empty fields |
+| `/trading-sync` | Full workflow: parse -> insert -> OHLCV | One command to do everything |
+
+### Quick Usage
+
+**Option 1: Step-by-step**
+```
+/trading-parse
+[paste your trading notes]
+[review ASCII table output]
+[confirm]
+/trading-insert
+/trading-ohlcv
+```
+
+**Option 2: All-in-one**
+```
+/trading-sync
+[paste your trading notes]
+[review and confirm at each step]
+```
+
+### Skill Files Location
+```
+.claude/commands/
+├── trading-parse.md    # Parse notes with timestamp extraction
+├── trading-insert.md   # Insert to Notion + Obsidian
+├── trading-ohlcv.md    # Populate OHLCV data
+└── trading-sync.md     # Combined full workflow
+```
+
+---
+
+## 🔧 Essential Scripts
+
+**IMPORTANT**: All scripts now support **dual-insert to both Notion and Obsidian** simultaneously. No additional commands needed - just run the scripts normally.
+
+### 1. Trading Research OHLCV Population
 **File**: `populate_trading_research.py`
 **Purpose**: Populate empty Trading Research fields with previous day OHLCV data
 **Usage**: `python3 populate_trading_research.py`
+**Obsidian**: Updates existing markdown files with OHLCV data using cached notion-id lookups
 
 **Key Features**:
 - ✅ **Dual API Support**: Alpha Vantage (primary) + EODHD (backup)
@@ -51,20 +104,49 @@ This is a fully functional Notion trading system integration that populates Trad
 - ✅ **Rate Limiting**: Respects both APIs' limits with intelligent rotation
 - ✅ **Error Handling**: Skips problematic tickers (like .SPX) and continues
 
-### Utility Scripts
-- **`setup_mcp.py`**: Sets up Notion MCP server (if needed)
-- **`test_mcp_integration.py`**: Tests MCP server functionality
-- **`add_ladder_column.py`**: Adds Ladder column to Trading Research (one-time use)
+### 2. Trading Notes Insertion
+**File**: `insert_trading_notes.py`
+**Purpose**: Template for inserting manually parsed trading notes into Trading Research
+**Usage**:
+1. Edit the script to add parsed entries
+2. Run `python3 insert_trading_notes.py`
+**Obsidian**: Creates new markdown files with generated filenames (e.g., `$TSLA R429.8 S424.8 - 06232025.md`)
 
-### Infrastructure Files
-- **`.env`**: API keys and configuration
-- **`requirements.txt`**: Python dependencies
-- **`README.md`**: Original comprehensive documentation
-- **`CLAUDE.md`**: This file - production documentation
+**When to use**: After parsing Chinese trading notes (see parsing workflow below)
 
-## 📋 Regular Update Process
+### 3. Trading Notes Parsing (Manual with Claude)
+**File**: `TRADING_NOTES_PARSER.md` (reference guide for parsing rules)
+**Approach**: Manual parsing with Claude assistance
 
-### Standard Workflow
+**Why Manual?**
+Tested Ollama automation (qwen3:latest) but found:
+- 3+ minute processing time (vs 10-15 min manual for 20 entries)
+- 85% accuracy (vs 95-100% manual)
+- Merged entries incorrectly
+- Missing entries
+- Not worth the accuracy tradeoff
+
+**Recommended Workflow**:
+1. Share Chinese trading notes with Claude in conversation
+2. Claude extracts timestamps from chat messages (e.g., `自由自在 — 12/24/25, 9:46 AM` → `2025-12-24T09:46:00`)
+3. Claude parses following rules in `TRADING_NOTES_PARSER.md`
+4. Claude outputs parsed data as **ASCII box-drawing table** for user review
+5. User confirms the parsed output
+6. Claude updates `insert_trading_notes.py` with entries and runs it
+7. Run `populate_trading_research.py` to fill OHLCV data
+
+**Parsing Output Format** (ASCII table for visualization):
+```
+┌────┬────────┬──────────────────┬───────────┬─────────┬───────────┬────────────┬────────┬───────────────────────┐
+│ #  │ Ticker │ Date/Time        │ Resistance│ Support │ Buy Point │ Sell Point │ Ladder │ Notes                 │
+├────┼────────┼──────────────────┼───────────┼─────────┼───────────┼────────────┼────────┼───────────────────────┤
+│ 1  │ $TSLA  │ 2025-12-24 09:30 │ 491-493   │ 484     │ -         │ -          │ -      │ 想冲491-493。支撑484  │
+└────┴────────┴──────────────────┴───────────┴─────────┴───────────┴────────────┴────────┴───────────────────────┘
+```
+
+## 📋 Regular Update Workflows
+
+### Workflow 1: Populate OHLCV Data for Existing Entries
 ```bash
 # Navigate to project directory
 cd /Users/yueqiu/rimu/notion
@@ -73,12 +155,19 @@ cd /Users/yueqiu/rimu/notion
 python3 populate_trading_research.py
 ```
 
-### Expected Results
+**Expected Results**:
 - Script will process any Trading Research entries with empty previous day fields
 - Uses Date column to calculate which previous trading day to fetch
 - Fills Prev. Close, Prev. High, Prev. Low, Prev. Volume with accurate data
 - Skips .SPX entries (these require special handling not currently implemented)
 - Typically processes 20-50 entries per run depending on new entries
+
+### Workflow 2: Parse and Insert Trading Notes
+1. **User provides Chinese trading notes**
+2. **Claude parses the notes** following `TRADING_NOTES_PARSER.md` rules
+3. **User reviews** parsed output
+4. **User manually inserts** to Notion (or uses `insert_trading_notes.py`)
+5. **User runs** `python3 populate_trading_research.py` to fill OHLCV data
 
 ### Success Indicators
 ```
@@ -143,10 +232,17 @@ Trading Research Entry → Stock 1 Relation → Stocks Database → Ticker Symbo
 ## 🚀 Quick Actions for Future Sessions
 
 ### "Populate more empty fields" or "Update Trading Research"
-```bash
-python3 populate_trading_research.py
-```
-**What it does**: Automatically finds and fills empty Trading Research entries
+**Use skill**: `/trading-ohlcv`
+**Or manually**: `python3 populate_trading_research.py`
+
+### "Parse my trading notes"
+**Use skill**: `/trading-sync` (full workflow) or `/trading-parse` (parse only)
+**Or manually**:
+1. Share notes with Claude
+2. Claude extracts timestamps and parses
+3. Claude outputs ASCII table for review
+4. After confirmation, Claude updates `insert_trading_notes.py` and runs it
+5. Run `/trading-ohlcv` to fill OHLCV data
 
 ### "Check current status"
 ```bash
@@ -182,12 +278,6 @@ print(f'Entries needing data: {len(data.get(\"results\", []))}')
 "
 ```
 
-### "Add new Trading Research entries"
-1. Manually add entries to Notion Trading Research database
-2. Ensure **Date** and **Stock 1** relation fields are filled
-3. Run: `python3 populate_trading_research.py`
-4. Script will automatically detect and fill new empty entries
-
 ## 🔧 Troubleshooting
 
 ### Common Issues
@@ -211,108 +301,132 @@ print(f'Entries needing data: {len(data.get(\"results\", []))}')
 - **Cause**: .env file not found or missing keys
 - **Fix**: Ensure .env file exists with all three API keys
 
-### Debug Mode
-Add this to enable verbose logging:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
 ## 📊 Performance Metrics
 
-### Typical Run Statistics
+### OHLCV Population Statistics
 - **Processing Speed**: ~1-2 entries per minute (due to API delays)
 - **Success Rate**: 92-95% (only .SPX entries fail)
 - **API Usage**: 25 Alpha Vantage + 20-50 EODHD requests per run
 - **Runtime**: 2-5 minutes per session (times out, run again to continue)
 
+### Trading Notes Parsing Statistics
+- **Manual Parsing Time**: 10-15 minutes for 20 entries
+- **Manual Accuracy**: 95-100%
+- **Ollama Automation** (tested, not recommended):
+  - Time: 3+ minutes
+  - Accuracy: 85%
+  - Issues: Merged entries, missing entries, incorrect values
+
 ### Current Database Status
 - **Total Entries**: 98
 - **Successfully Populated**: 53
 - **Remaining Empty**: 45 (.SPX index entries + invalid/delisted tickers)
-- **Last Full Update**: October 24, 2025
-
-### Managing EODHD API Keys
-
-#### Adding New Keys
-1. Get new API key from https://eodhd.com/register
-2. Open `.env` file
-3. Add to `EODHD_API_KEYS` comma-separated list:
-   ```
-   EODHD_API_KEYS=key1,key2,key3
-   ```
-4. Script automatically detects and uses all keys
-
-#### When to Add More Keys
-- **Current capacity**: 2 keys = ~100-200 API calls per day
-- **Add keys when**: Processing more than 50 entries daily
-- **Cost**: Free tier available for each new account
-- **Benefit**: Multiply daily capacity by number of keys
-
-#### Key Rotation Logs
-Look for these messages to monitor rotation:
-```
-Initialized with 2 EODHD API key(s)
-Rotating EODHD API key (exhausted 1/2 keys)
-All EODHD API keys have been exhausted
-```
+- **Last Full Update**: November 26, 2025
 
 ## 🎯 Important Notes for Claude
 
 ### Always Use This Process
 1. **Read this CLAUDE.md file first** to understand current state
-2. **Use the working script**: `populate_trading_research.py`
-3. **Never try to use MCP for the main population** - the working script already handles everything
+2. **For OHLCV population**: Use `populate_trading_research.py`
+3. **For trading notes parsing**:
+   - Extract timestamps from chat messages
+   - Parse following `TRADING_NOTES_PARSER.md`
+   - Output as ASCII box-drawing table
+   - After user confirms, update `insert_trading_notes.py` and run it
 4. **Expect .SPX warnings** - these are normal and can't be filled with current APIs
 5. **Multiple runs are normal** - script times out due to rate limiting, just run again
 
 ### When User Says "Populate empty fields"
-- They mean Trading Research previous day data
+- They mean Trading Research previous day OHLCV data
 - Run: `python3 populate_trading_research.py`
 - Expect 50-90% success rate (depending on .SPX entries)
 - Ignore .SPX warnings and invalid ticker warnings
 - Key rotation happens automatically when limits hit
 - Look for "Rotating EODHD API key" messages in output
 
+### When User Says "Parse my trading notes"
+- They want you to parse Chinese trading notes
+- **Extract timestamps** from chat messages (e.g., `自由自在 — 12/24/25, 9:46 AM` → `2025-12-24T09:46:00`)
+- Follow rules in `TRADING_NOTES_PARSER.md`
+- **Output as ASCII box-drawing table** for easy visualization:
+  ```
+  ┌────┬────────┬──────────────────┬───────────┬─────────┬───────────┬────────────┬────────┬─────────┐
+  │ #  │ Ticker │ Date/Time        │ Resistance│ Support │ Buy Point │ Sell Point │ Ladder │ Notes   │
+  ├────┼────────┼──────────────────┼───────────┼─────────┼───────────┼────────────┼────────┼─────────┤
+  │ 1  │ $TSLA  │ 2025-12-24 09:30 │ 491-493   │ 484     │ -         │ -          │ -      │ ...     │
+  └────┴────────┴──────────────────┴───────────┴─────────┴───────────┴────────────┴────────┴─────────┘
+  ```
+- After user confirms, **update `insert_trading_notes.py`** with entries and run it
+- DO NOT suggest Ollama automation (tested, not accurate enough)
+
 ### File Structure (Clean State)
 ```
 /Users/yueqiu/rimu/notion/
-├── populate_trading_research.py    # 🚀 Main production script
-├── CLAUDE.md                       # 📖 This documentation (READ FIRST)
-├── .env                           # 🔑 API keys and configuration
-├── requirements.txt               # 📦 Python dependencies
-├── README.md                       # 📚 Original comprehensive docs
-├── setup_mcp.py                   # 🔧 MCP setup (if needed)
-├── test_mcp_integration.py        # 🧪 MCP testing
-├── add_ladder_column.py            # 📊 Ladder column utilities
-├── test_ladder_column_mcp.py       # 🧪 Ladder tests
-└── [docker/infrastructure files]   # 🐳 Container setup (optional)
+├── .claude/
+│   └── commands/                    # Claude Skills (slash commands)
+│       ├── trading-parse.md         # /trading-parse - Parse notes
+│       ├── trading-insert.md        # /trading-insert - Insert to Notion
+│       ├── trading-ohlcv.md         # /trading-ohlcv - Populate OHLCV
+│       └── trading-sync.md          # /trading-sync - Full workflow
+├── populate_trading_research.py     # OHLCV population script (dual-insert)
+├── populate_empty_stocks.py         # Stocks database population (dual-insert)
+├── insert_trading_notes.py          # Manual insertion template (dual-insert)
+├── obsidian_sync.py                 # Obsidian integration utility module
+├── test_obsidian_integration.py     # Integration test suite
+├── OBSIDIAN_INTEGRATION.md          # Obsidian integration docs
+├── TRADING_NOTES_PARSER.md          # Parsing rules reference
+├── CLAUDE.md                        # This documentation (READ FIRST)
+├── QUICK_START.md                   # Quick reference guide
+├── .env                             # API keys and Obsidian paths
+├── requirements.txt                 # Python dependencies
+├── README.md                        # Original comprehensive docs
+└── archive/                         # Experimental/testing files
 ```
 
-**Key Files:**
-- ✅ **`populate_trading_research.py`**: The only script you need for regular updates
-- ✅ **`CLAUDE.md`**: Complete documentation for Claude (this file)
-- ✅ **`.env`**: Contains all API keys
-- ✅ **`requirements.txt`**: Python dependencies (already installed)
+**Essential Files:**
+- ✅ **`.claude/commands/`**: Claude Skills - `/trading-parse`, `/trading-insert`, `/trading-ohlcv`, `/trading-sync`
+- ✅ **`populate_trading_research.py`**: OHLCV population (use regularly) - **dual-insert**
+- ✅ **`insert_trading_notes.py`**: Insertion template (used by `/trading-insert`) - **dual-insert**
+- ✅ **`TRADING_NOTES_PARSER.md`**: Parsing rules reference
+- ✅ **`CLAUDE.md`**: Complete documentation (this file - READ FIRST)
+- ✅ **`.env`**: Contains all API keys + Obsidian paths
 
 ### Success Criteria
-- Script runs without crashing
+- OHLCV script runs without crashing
 - See "✓ Updated [TICKER]" messages
 - .SPX warnings are expected and OK
 - 90%+ entries successfully populated
+- Trading notes parsed accurately (manual review confirms)
 
 ## 🎉 System Status: PRODUCTION READY
 
-This system is fully functional and ready for regular use. The Trading Research database population works reliably with:
+This system is fully functional and ready for regular use:
+
+### OHLCV Population
 - **Dual API backup** (Alpha Vantage + EODHD)
 - **Multi-key rotation** (automatic switching when daily limits hit)
 - **Proper error handling** (skips invalid tickers, continues processing)
 - **Excellent success rates** for all tradeable securities (50-90% depending on entry composition)
+- **Dual-insert to Obsidian** (automatic markdown file updates)
 
-### Latest Enhancement (October 24, 2025)
-Added multi-key rotation system for EODHD API:
-- Support for multiple API keys in comma-separated format
-- Automatic rotation when a key hits daily limit (402 error)
-- Seamless continuation of processing with next available key
-- Backward compatible with single-key configuration
-- Daily capacity scales with number of keys (2 keys = 2x capacity)
+### Trading Notes Parsing
+- **Manual parsing with Claude assistance** (recommended approach)
+- **95-100% accuracy** with manual review
+- **10-15 minutes** for typical batch of 20 entries
+- **Automation tested but not recommended** (Ollama: 85% accuracy, merges entries incorrectly)
+- **Dual-insert to Obsidian** (creates markdown files with generated filenames)
+
+### Obsidian Integration (NEW - December 3, 2025)
+- **All 3 scripts support dual-insert** (Notion + Obsidian simultaneously)
+- **No user-facing changes** (scripts work exactly the same)
+- **High performance** (1,368 file cache built in 0.14 seconds)
+- **Non-blocking failures** (Obsidian errors don't stop Notion operations)
+- **Full test coverage** (test suite verifies all functionality)
+- **Pattern matching** (filenames match existing 1,368 files convention)
+
+### Latest Updates
+- **January 8, 2026**: Added Claude Skills (`/trading-parse`, `/trading-insert`, `/trading-ohlcv`, `/trading-sync`)
+- **January 8, 2026**: Updated parsing workflow - timestamp extraction, ASCII box-drawing table output
+- **December 3, 2025**: Added Obsidian dual-insert integration to all 3 scripts
+- **November 26, 2025**: Cleaned up directory structure, tested Ollama automation
+- **Status**: Production ready with Claude Skills + dual Notion/Obsidian support
